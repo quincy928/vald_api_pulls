@@ -1,0 +1,5 @@
+Rebuilding the image command:
+docker build -t nord_bord .
+
+Deploying a container and mounting to local host directory
+docker run -v "C:/Users/Catapult/UC San Diego/APU - Athlete Monitoring/AthleteMonitoringAPI:/app/data" nord_bord
