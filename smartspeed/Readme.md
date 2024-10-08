@@ -64,6 +64,8 @@ This repository demonstrates the integration of **SmartSpeed** with the `vald` c
 ### File Structure
 - `Smartspeed Integration.ipynb`: Jupyter notebook containing the code for SmartSpeed data integration.
 - `requirements.txt`: List of required Python packages for running the notebook.
+- `vald_smartspeed.py`: Python file containing the Vald class and it's attributes and methods. 
+- `main_smartspeed.py`: Python file that will auto-populate your Smartspeed data in the directory where it is run.
 - `.env`: Environment file for storing API credentials (not included, you must create your own).
 
 
