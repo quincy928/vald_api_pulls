@@ -12,6 +12,7 @@ def main():
     logging.info('Starting...')
     
     vald = Vald()
+    vald.get_weight_table()
     if os.path.exists(vald.vald_master_file_path) == False:
             print("Setting up intial")
             vald.retrieve_tests_until_today('2023-08-01T00:00:00Z')
@@ -24,6 +25,7 @@ def main():
             time.sleep(30)
             countdown -= 30
         vald.update_forcedecks()
+        vald.get_weight_table()
 
 if __name__ == "__main__":
     main()

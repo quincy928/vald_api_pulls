@@ -363,7 +363,8 @@ class Vald():
                                 'Eccentric Deceleration Impulse_Trial': 'Eccentric Deceleration Impulse [N s]',
                                 'Concentric Impulse (Abs) / BM_Trial': 'Concentric Impulse (Abs) / BM [N s]',
                                 'Eccentric Braking Impulse_Trial': 'Eccentric Braking Impulse [N s]',
-                                'Takeoff Peak Force / BM_Trial': 'Takeoff Peak Force / BM [N/kg]'
+                                'Takeoff Peak Force / BM_Trial': 'Takeoff Peak Force / BM [N/kg]',
+                                'Vertical Velocity at Takeoff_Trial': 'Vertical Velocity at Takeoff [m/s]'
                             })
         columns_to_keep = [
                             'Name',
@@ -396,7 +397,8 @@ class Vald():
                             'Eccentric Braking Impulse [N s]',
                             'Takeoff Peak Force / BM [N/kg]',
                             'Tag',
-                            'Tag Type'
+                            'Tag Type',
+                            'Vertical Velocity at Takeoff [m/s]'
                         ]
         for column in columns_to_keep:
             if column not in df.columns:
@@ -1265,6 +1267,9 @@ class Vald():
 
     def update_master_file(self, new_data):
         print(self.vald_master_file_path)
+        directory = os.path.dirname(self.vald_master_file_path)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
         if os.path.exists(self.vald_master_file_path):
             with open(self.vald_master_file_path, 'a') as f:
                 f.write('\n')
@@ -1296,7 +1301,6 @@ class Vald():
                 existing_file_path = None
                 
                 
-                # Update: Include file extension in matching
                 search_pattern = f"{self.sanitize_filename(team_name.lower()).replace('/', '-')}_{test_type.lower().replace(' ', '_').replace('/', '-')}_*.csv"
                 
                 for file in os.listdir(forcedecks_folder):
@@ -1340,15 +1344,8 @@ class Vald():
                     print(f'Formatting {test_type} df')
 
                 if os.path.exists(new_file_path):
-
-                    existing_df = pd.read_csv(new_file_path)
-                    for col in df.columns:
-                        if col not in existing_df.columns:
-                            existing_df[col] = pd.NA
-                    existing_df = existing_df[df.columns]
-                    combined_df = pd.concat([existing_df, df], ignore_index=True)
-                    combined_df.to_csv(new_file_path, mode='w', header=True, index=False)
-                    print(f"Reordered existing data and appended new data to {new_file_path}")
+                    df.to_csv(new_file_path, mode='a', header=False, index=False)
+                    print(f"Appended data to {new_file_path}")
                 else:
                     df.to_csv(new_file_path, index=False)
                     print(f"Created and saved new file {new_file_path}")
@@ -1459,3 +1456,76 @@ class Vald():
         teams_data = self.data_to_groups(new_data)
 
         self.save_dataframes(teams_data)
+
+
+    def get_weight_table(self):
+        if os.path.exists(self.vald_master_file_path) == False:
+            print("No master file found")
+            return
+        master_df = pd.read_csv(self.vald_master_file_path)
+        sports = master_df['Groups'].unique()
+    
+        # Define the date range
+        date_range = pd.date_range(start='2023-08-01', end='2025-06-30')
+    
+        all_weight_tables = []
+    
+        for sport in sports:
+            cmj_path = f'data/{sport}/ForceDecks/{sport}_cmj.csv'
+            sj_path = f'data/{sport}/ForceDecks/{sport}_sj.csv'
+    
+            # Load weight data based on file availability
+            if os.path.exists(cmj_path):
+                print(f"Using CMJ weight for {sport}")
+                weight_data = pd.read_csv(cmj_path)
+            elif os.path.exists(sj_path):
+                print(f"Using SJ weight for {sport}")
+                weight_data = pd.read_csv(sj_path)
+            else:
+                print(f"No CMJ or SJ recorded for {sport}.")
+                continue
+    
+            # Convert the 'Date' column to datetime
+            weight_data['Date'] = pd.to_datetime(weight_data['Date'])
+    
+            athletes = weight_data['Name'].unique()
+    
+            # Create a complete date-Name grid
+            weight_table = pd.DataFrame(
+                [(athlete, date) for athlete in athletes for date in date_range],
+                columns=['Name', 'Date']
+            )
+    
+            # Map weights directly to the new weight table
+            weight_table = weight_table.merge(
+                weight_data[['Name', 'Date', 'BW [KG]']],
+                on=['Name', 'Date'], how='left'
+            )
+    
+            # Create a new column to store the filled weights
+            weight_table['Weight'] = weight_table['BW [KG]']
+    
+            # Iterate over each athlete to fill weights
+            for athlete in athletes:
+                athlete_weights = weight_table[weight_table['Name'] == athlete]
+    
+                first_recorded_date = athlete_weights['Date'][athlete_weights['Weight'].notna()].min()
+                
+                weight_table['Weight'] = weight_table.groupby('Name')['BW [KG]'].ffill()
+                weight_table['Weight'] = weight_table.groupby('Name')['Weight'].bfill()
+    
+            # Drop the original 'BW [KG]' column
+            weight_table.drop(columns=['BW [KG]'], inplace=True)
+    
+            # Save the weight table for each sport
+            output_path = f'data/{sport}/ForceDecks/{sport}_weight_table.csv'
+            weight_table.to_csv(output_path, index=False)
+            print(f"Saved weight table for {sport} at {output_path}.")
+    
+            # Store the weight table for optional further use
+            all_weight_tables.append(weight_table)
+    
+        # Optional: Combine all weight tables if needed
+        return pd.concat(all_weight_tables, ignore_index=True) if all_weight_tables else None
+
+        
